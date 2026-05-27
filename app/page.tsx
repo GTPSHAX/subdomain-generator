@@ -5,23 +5,46 @@ import { useState } from "react";
 
 const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN;
 
+type RecordType = 'A' | 'AAAA' | 'CNAME' | 'MX' | 'TXT';
+
+type FormState = {
+  type: RecordType;
+  name: string;
+  content: string;
+  ttl: number;
+  proxied: boolean;
+  ipv4Only: boolean;
+  ipv6Only: boolean;
+  tags: string;
+};
+
 export default function Home() {
-  const [type, setType] = useState('A');
-  const [name, setName] = useState('test');
-  const [content, setContent] = useState('127.0.0.1');
-  const [ttl, setTtl] = useState(3600);
-  const [comment, setComment] = useState('');
-  const [proxied, setProxied] = useState(true);
-  const [ipv4Only, setIpv4Only] = useState(false);
-  const [ipv6Only, setIpv6Only] = useState(false);
-  const [tags, setTags] = useState('');
+  const [form, setForm] = useState<FormState>({
+    type: 'A',
+    name: 'test',
+    content: '127.0.0.1',
+    ttl: 3600,
+    proxied: true,
+    ipv4Only: false,
+    ipv6Only: false,
+    tags: '',
+  });
   const [message, setMessage] = useState('');
+  const [generatedAccessKey, setGeneratedAccessKey] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const updateForm = <K extends keyof FormState>(field: K, value: FormState[K]) => {
+    setForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setMessage('');
+    setGeneratedAccessKey('');
     try {
       const response = await fetch('/api/create-dns-record', {
         method: 'POST',
@@ -29,22 +52,22 @@ export default function Home() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          type,
-          name,
-          content,
-          ttl,
-          comment: comment || undefined,
-          proxied,
+          type: form.type,
+          name: form.name,
+          content: form.content,
+          ttl: form.ttl,
+          proxied: form.proxied,
           settings: {
-            ipv4_only: ipv4Only,
-            ipv6_only: ipv6Only,
+            ipv4_only: form.ipv4Only,
+            ipv6_only: form.ipv6Only,
           },
-          tags: tags ? tags.split(',').map(tag => tag.trim()).filter(tag => tag) : [],
+          tags: form.tags ? form.tags.split(',').map((tag) => tag.trim()).filter((tag) => tag) : [],
         }),
       });
       const data = await response.json();
       if (response.ok) {
-        setMessage('DNS record created successfully!');
+        setMessage('DNS record created successfully. Save the access key below.');
+        setGeneratedAccessKey(data.access_key || '');
       } else {
         setMessage(`Error: ${data.error}`);
       }
@@ -65,8 +88,8 @@ export default function Home() {
             <label className="block text-sm font-medium text-gray-300">Record Type</label>
             <div className="relative">
               <select
-                value={type}
-                onChange={(e) => setType(e.target.value)}
+                value={form.type}
+                onChange={(e) => updateForm('type', e.target.value as RecordType)}
                 className="w-full p-3 bg-gray-700/50 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 appearance-none"
               >
                 <option value="A">A - IPv4 Address</option>
@@ -88,8 +111,8 @@ export default function Home() {
             <div className="relative">
               <input
                 type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+                value={form.name}
+                onChange={(e) => updateForm('name', e.target.value)}
                 className="w-full p-3 bg-gray-700/50 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 pl-10"
                 required
                 placeholder="e.g., www, api, mail"
@@ -101,7 +124,7 @@ export default function Home() {
               </div>
             </div>
             <p className="text-xs text-gray-400">
-              Will create: <Link href={`https://${name}.${baseDomain}`} target="_blank" className="font-mono text-blue-400">{name}.{baseDomain}</Link>
+              Will create: <Link href={`https://${form.name}.${baseDomain}`} target="_blank" className="font-mono text-blue-400">{form.name}.{baseDomain}</Link>
             </p>
           </div>
 
@@ -110,8 +133,8 @@ export default function Home() {
             <div className="relative">
               <input
                 type="text"
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
+                value={form.content}
+                onChange={(e) => updateForm('content', e.target.value)}
                 className="w-full p-3 bg-gray-700/50 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 pl-10"
                 required
                 placeholder="e.g., 192.168.1.1, example.com"
@@ -129,8 +152,8 @@ export default function Home() {
             <div className="relative">
               <input
                 type="number"
-                value={ttl}
-                onChange={(e) => setTtl(Number(e.target.value))}
+                value={form.ttl}
+                onChange={(e) => updateForm('ttl', Number(e.target.value))}
                 className="w-full p-3 bg-gray-700/50 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 pl-10"
                 required
                 min={30}
@@ -153,29 +176,18 @@ export default function Home() {
               </svg>
             </summary>
             <div className="space-y-4 mt-4 pt-4 border-t border-gray-700">
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-300">Comment</label>
-                <input
-                  type="text"
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  className="w-full p-3 bg-gray-700/50 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200"
-                  placeholder="Optional description"
-                />
-              </div>
-              
               <div className="space-y-3">
                 <label className="flex items-center justify-between p-3 bg-gray-700/30 rounded-lg cursor-pointer hover:bg-gray-700/50 transition-colors duration-200">
                   <span className="text-sm font-medium text-gray-300">Proxy through CDN</span>
                   <div className="relative inline-block w-10 mr-2 align-middle select-none">
                     <input
                       type="checkbox"
-                      checked={proxied}
-                      onChange={(e) => setProxied(e.target.checked)}
+                      checked={form.proxied}
+                      onChange={(e) => updateForm('proxied', e.target.checked)}
                       className="sr-only"
                     />
-                    <div className={`block w-10 h-6 rounded-full transition-colors duration-200 ease-in-out ${proxied ? 'bg-blue-500' : 'bg-gray-600'}`}></div>
-                    <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-200 ease-in-out transform ${proxied ? 'translate-x-4' : ''}`}></div>
+                    <div className={`block w-10 h-6 rounded-full transition-colors duration-200 ease-in-out ${form.proxied ? 'bg-blue-500' : 'bg-gray-600'}`}></div>
+                    <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-200 ease-in-out transform ${form.proxied ? 'translate-x-4' : ''}`}></div>
                   </div>
                 </label>
                 
@@ -184,12 +196,12 @@ export default function Home() {
                   <div className="relative inline-block w-10 mr-2 align-middle select-none">
                     <input
                       type="checkbox"
-                      checked={ipv4Only}
-                      onChange={(e) => setIpv4Only(e.target.checked)}
+                      checked={form.ipv4Only}
+                      onChange={(e) => updateForm('ipv4Only', e.target.checked)}
                       className="sr-only"
                     />
-                    <div className={`block w-10 h-6 rounded-full transition-colors duration-200 ease-in-out ${ipv4Only ? 'bg-green-500' : 'bg-gray-600'}`}></div>
-                    <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-200 ease-in-out transform ${ipv4Only ? 'translate-x-4' : ''}`}></div>
+                    <div className={`block w-10 h-6 rounded-full transition-colors duration-200 ease-in-out ${form.ipv4Only ? 'bg-green-500' : 'bg-gray-600'}`}></div>
+                    <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-200 ease-in-out transform ${form.ipv4Only ? 'translate-x-4' : ''}`}></div>
                   </div>
                 </label>
                 
@@ -198,12 +210,12 @@ export default function Home() {
                   <div className="relative inline-block w-10 mr-2 align-middle select-none">
                     <input
                       type="checkbox"
-                      checked={ipv6Only}
-                      onChange={(e) => setIpv6Only(e.target.checked)}
+                      checked={form.ipv6Only}
+                      onChange={(e) => updateForm('ipv6Only', e.target.checked)}
                       className="sr-only"
                     />
-                    <div className={`block w-10 h-6 rounded-full transition-colors duration-200 ease-in-out ${ipv6Only ? 'bg-purple-500' : 'bg-gray-600'}`}></div>
-                    <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-200 ease-in-out transform ${ipv6Only ? 'translate-x-4' : ''}`}></div>
+                    <div className={`block w-10 h-6 rounded-full transition-colors duration-200 ease-in-out ${form.ipv6Only ? 'bg-purple-500' : 'bg-gray-600'}`}></div>
+                    <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-200 ease-in-out transform ${form.ipv6Only ? 'translate-x-4' : ''}`}></div>
                   </div>
                 </label>
               </div>
@@ -212,8 +224,8 @@ export default function Home() {
                 <label className="block text-sm font-medium text-gray-300">Tags</label>
                 <input
                   type="text"
-                  value={tags}
-                  onChange={(e) => setTags(e.target.value)}
+                  value={form.tags}
+                  onChange={(e) => updateForm('tags', e.target.value)}
                   className="w-full p-3 bg-gray-700/50 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200"
                   placeholder="tag1, tag2, tag3"
                 />
@@ -256,6 +268,16 @@ export default function Home() {
               : 'bg-green-900/30 text-green-300 border border-green-700/50'
           }`}>
             {message}
+          </div>
+        )}
+
+        {generatedAccessKey && (
+          <div className="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-100">
+            <p className="font-semibold">Access key generated</p>
+            <p className="mt-1 text-amber-50/90">Save this key now. You will need it to edit the DNS record later.</p>
+            <div className="mt-3 rounded-md border border-amber-400/30 bg-black/30 px-3 py-2 font-mono text-xs break-all text-amber-100">
+              {generatedAccessKey}
+            </div>
           </div>
         )}
       </div>
