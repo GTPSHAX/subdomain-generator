@@ -46,12 +46,11 @@ export async function POST(request: Request) {
 			zone_id: zoneId,
 			name: { exact: name },
 			comment: { exact: access_key },
-			type,
 		});
 
 		const matchingRecords = [];
 		for await (const record of records) {
-			if (record.name === name && record.comment === access_key && record.type === type) {
+			if (record.name === name && record.comment === access_key) {
 				matchingRecords.push(record);
 			}
 		}
