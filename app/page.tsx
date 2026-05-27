@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { AlertCircle, CheckCircle2, Loader2, Search } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2, Search, Copy, Eye, EyeOff, Check } from "lucide-react";
 
 const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN;
 
@@ -35,6 +35,18 @@ export default function Home() {
   const [message, setMessage] = useState('');
   const [generatedAccessKey, setGeneratedAccessKey] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [showKey, setShowKey] = useState(false);
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy text: ', err);
+    }
+  };
 
   const updateForm = <K extends keyof FormState>(field: K, value: FormState[K]) => {
     setForm((current) => ({
@@ -127,10 +139,11 @@ export default function Home() {
           setMessage('DNS record updated successfully.');
           setAccessKey('');
         } else {
-          setMessage('DNS record created successfully. Save the access key below.');
+          setMessage('DNS record created successfully.');
           setGeneratedAccessKey(data.access_key || '');
+          setShowKey(false);
           setCheckStatus('exists');
-          setAccessKey(data.access_key || '');
+          setAccessKey('');
         }
       } else {
         setMessage(`Error: ${data.error}`);
@@ -384,17 +397,48 @@ export default function Home() {
             {message}
           </div>
         )}
-
-        {generatedAccessKey && (
-          <div className="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-100">
-            <p className="font-semibold">Access key generated</p>
-            <p className="mt-1 text-amber-50/90">Save this key now. You will need it to edit the DNS record later.</p>
-            <div className="mt-3 rounded-md border border-amber-400/30 bg-black/30 px-3 py-2 font-mono text-xs break-all text-amber-100">
-              {generatedAccessKey}
-            </div>
-          </div>
-        )}
       </div>
+
+      {generatedAccessKey && (
+        <div className="fixed inset-0 overflow-hidden z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-md rounded-2xl border border-amber-500/40 bg-gray-900 p-6 text-sm text-amber-100 shadow-2xl scale-in-95 duration-200">
+            <div className="flex items-center justify-between mb-2">
+              <p className="font-bold text-lg text-amber-200">Access Key Generated</p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowKey(!showKey)}
+                  className="p-2 hover:bg-amber-500/20 rounded-md transition-colors text-amber-200 hover:text-amber-100"
+                  title={showKey ? "Hide access key" : "Show access key"}
+                >
+                  {showKey ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(generatedAccessKey)}
+                  className="p-2 hover:bg-amber-500/20 rounded-md transition-colors text-amber-200 hover:text-amber-100 flex items-center"
+                  title="Copy access key"
+                >
+                  {copied ? <Check className="h-5 w-5 text-green-400" /> : <Copy className="h-5 w-5" />}
+                </button>
+              </div>
+            </div>
+            <p className="mt-1 text-amber-50/90 text-sm">
+              Save this key now. You will need it to edit or delete the DNS record later.
+            </p>
+            <div className="mt-4 rounded-md border border-amber-400/30 bg-black/60 px-4 py-3 font-mono text-base break-all text-amber-100 tracking-wider text-center">
+              {showKey ? generatedAccessKey : '•'.repeat(24)}
+            </div>
+            <button
+              type="button"
+              onClick={() => setGeneratedAccessKey('')}
+              className="mt-6 w-full rounded-lg bg-amber-600/20 py-3 font-semibold text-amber-200 hover:bg-amber-600/30 transition-colors border border-amber-500/30"
+            >
+              I have saved the key
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
