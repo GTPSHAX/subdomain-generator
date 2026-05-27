@@ -29,6 +29,8 @@ export default function Home() {
     ipv6Only: false,
     tags: '',
   });
+  const [accessKey, setAccessKey] = useState('');
+  const [checkStatus, setCheckStatus] = useState<'idle' | 'checking' | 'available' | 'exists'>('idle');
   const [message, setMessage] = useState('');
   const [generatedAccessKey, setGeneratedAccessKey] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -40,13 +42,66 @@ export default function Home() {
     }));
   };
 
+  const handleNameChange = (value: string) => {
+    updateForm('name', value);
+    setCheckStatus('idle');
+    setAccessKey('');
+    setGeneratedAccessKey('');
+  };
+
+  const checkDnsRecord = async () => {
+    setCheckStatus('checking');
+    setMessage('');
+    setAccessKey('');
+    setGeneratedAccessKey('');
+
+    try {
+      const response = await fetch('/api/check-dns-record', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: form.name,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setCheckStatus('idle');
+        setMessage(`Error: ${data.error}`);
+        return;
+      }
+
+      if (data.exists) {
+        setCheckStatus('exists');
+        setMessage('Subdomain already exists. Enter the access key to update it.');
+        return;
+      }
+
+      setCheckStatus('available');
+      setMessage('Subdomain is available. You can create it now.');
+    } catch {
+      setCheckStatus('idle');
+      setMessage('Failed to check DNS record. Please try again.');
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (checkStatus === 'idle' || checkStatus === 'checking') {
+      setMessage('Check the subdomain first.');
+      return;
+    }
+
     setIsSubmitting(true);
     setMessage('');
     setGeneratedAccessKey('');
     try {
-      const response = await fetch('/api/create-dns-record', {
+      const isUpdating = checkStatus === 'exists';
+      const response = await fetch(isUpdating ? '/api/edit-dns-record' : '/api/create-dns-record', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -61,18 +116,26 @@ export default function Home() {
             ipv4_only: form.ipv4Only,
             ipv6_only: form.ipv6Only,
           },
+          access_key: isUpdating ? accessKey : undefined,
           tags: form.tags ? form.tags.split(',').map((tag) => tag.trim()).filter((tag) => tag) : [],
         }),
       });
       const data = await response.json();
       if (response.ok) {
-        setMessage('DNS record created successfully. Save the access key below.');
-        setGeneratedAccessKey(data.access_key || '');
+        if (isUpdating) {
+          setMessage('DNS record updated successfully.');
+          setAccessKey('');
+        } else {
+          setMessage('DNS record created successfully. Save the access key below.');
+          setGeneratedAccessKey(data.access_key || '');
+          setCheckStatus('exists');
+          setAccessKey(data.access_key || '');
+        }
       } else {
         setMessage(`Error: ${data.error}`);
       }
     } catch {
-      setMessage('Failed to create DNS record. Please try again.');
+      setMessage(`Failed to ${checkStatus === 'exists' ? 'update' : 'create'} DNS record. Please try again.`);
     } finally {
       setIsSubmitting(false);
     }
@@ -112,7 +175,7 @@ export default function Home() {
               <input
                 type="text"
                 value={form.name}
-                onChange={(e) => updateForm('name', e.target.value)}
+                  onChange={(e) => handleNameChange(e.target.value)}
                 className="w-full p-3 bg-gray-700/50 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 pl-10"
                 required
                 placeholder="e.g., www, api, mail"
@@ -126,6 +189,18 @@ export default function Home() {
             <p className="text-xs text-gray-400">
               Will create: <Link href={`https://${form.name}.${baseDomain}`} target="_blank" className="font-mono text-blue-400">{form.name}.{baseDomain}</Link>
             </p>
+            <button
+              type="button"
+              onClick={checkDnsRecord}
+              disabled={checkStatus === 'checking' || isSubmitting || !form.name.trim()}
+              className={`mt-2 inline-flex items-center rounded-lg px-4 py-2 text-sm font-semibold text-white transition-colors duration-200 ${
+                checkStatus === 'checking' || isSubmitting || !form.name.trim()
+                  ? 'bg-gray-600 cursor-not-allowed'
+                  : 'bg-sky-600 hover:bg-sky-500'
+              }`}
+            >
+              {checkStatus === 'checking' ? 'Checking...' : 'Check DNS Record'}
+            </button>
           </div>
 
           <div className="space-y-2">
@@ -233,11 +308,28 @@ export default function Home() {
             </div>
           </details>
 
+          {checkStatus === 'exists' && (
+            <div className="space-y-2 rounded-lg border border-sky-500/30 bg-sky-500/10 p-4">
+              <label className="block text-sm font-medium text-gray-300">Access Key</label>
+              <input
+                type="text"
+                value={accessKey}
+                onChange={(e) => setAccessKey(e.target.value)}
+                className="w-full p-3 bg-gray-700/50 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200"
+                placeholder="Enter access key"
+                required
+              />
+              <p className="text-xs text-gray-400">
+                This key is required to update the existing DNS record.
+              </p>
+            </div>
+          )}
+
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || checkStatus === 'idle' || checkStatus === 'checking' || (checkStatus === 'exists' && !accessKey)}
             className={`w-full py-3 px-4 rounded-lg font-bold text-white transition-all duration-300 flex items-center justify-center ${
-              isSubmitting 
+              isSubmitting || checkStatus === 'idle' || checkStatus === 'checking' || (checkStatus === 'exists' && !accessKey)
                 ? 'bg-gray-600 cursor-not-allowed' 
                 : 'bg-linear-to-r from-green-600 to-emerald-600 hover:opacity-80 shadow-lg'
             }`}
@@ -255,7 +347,7 @@ export default function Home() {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                 </svg>
-                Create DNS Record
+                {checkStatus === 'exists' ? 'Update DNS Record' : 'Create DNS Record'}
               </>
             )}
           </button>
