@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { AlertCircle, CheckCircle2, Loader2, Search } from "lucide-react";
 
 const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN;
 
@@ -171,36 +172,53 @@ export default function Home() {
 
           <div className="space-y-2">
             <label className="block text-sm font-medium text-gray-300">Subdomain Name</label>
-            <div className="relative">
-              <input
-                type="text"
-                value={form.name}
+            <div className="flex gap-3">
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  value={form.name}
                   onChange={(e) => handleNameChange(e.target.value)}
-                className="w-full p-3 bg-gray-700/50 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 pl-10"
-                required
-                placeholder="e.g., www, api, mail"
-              />
-              <div className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                </svg>
+                  className="w-full p-3 bg-gray-700/50 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 pl-10"
+                  required
+                  placeholder="e.g., www, api, mail"
+                />
+                <div className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                  </svg>
+                </div>
               </div>
+
+              <button
+                type="button"
+                onClick={checkDnsRecord}
+                disabled={checkStatus === 'checking' || isSubmitting || !form.name.trim()}
+                aria-label="Check DNS record"
+                title="Check DNS record"
+                className={`inline-flex shrink-0 items-center justify-center rounded-lg px-4 py-2 text-white transition-colors duration-200 ${
+                  checkStatus === 'checking' || isSubmitting || !form.name.trim()
+                    ? 'bg-gray-600 cursor-not-allowed' :
+                  checkStatus === 'available'
+                    ? 'bg-green-600 hover:bg-green-500' :
+                  checkStatus === 'exists'
+                    ? 'bg-red-600 hover:bg-red-500' :
+                    'bg-sky-600 hover:bg-sky-500'
+                }`}
+              >
+                {checkStatus === 'checking' ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : checkStatus === 'available' ? (
+                  <CheckCircle2 className="h-5 w-5" />
+                ) : checkStatus === 'exists' ? (
+                  <AlertCircle className="h-5 w-5" />
+                ) : (
+                  <Search className="h-5 w-5" />
+                )}
+              </button>
             </div>
             <p className="text-xs text-gray-400">
               Will create: <Link href={`https://${form.name}.${baseDomain}`} target="_blank" className="font-mono text-blue-400">{form.name}.{baseDomain}</Link>
             </p>
-            <button
-              type="button"
-              onClick={checkDnsRecord}
-              disabled={checkStatus === 'checking' || isSubmitting || !form.name.trim()}
-              className={`mt-2 inline-flex items-center rounded-lg px-4 py-2 text-sm font-semibold text-white transition-colors duration-200 ${
-                checkStatus === 'checking' || isSubmitting || !form.name.trim()
-                  ? 'bg-gray-600 cursor-not-allowed'
-                  : 'bg-sky-600 hover:bg-sky-500'
-              }`}
-            >
-              {checkStatus === 'checking' ? 'Checking...' : 'Check DNS Record'}
-            </button>
           </div>
 
           <div className="space-y-2">
