@@ -28,13 +28,13 @@ export async function POST(request: Request) {
 			);
 		}
 
-		const records = cf.dns.records.list({
+		const records = await cf.dns.records.list({
 			zone_id: zoneId,
-			name: { exact: parsedBody.data.name },
+			name: { exact: parsedBody.data.name + '.' + process.env.NEXT_PUBLIC_BASE_DOMAIN },
 		});
 
 		for await (const record of records) {
-			if (record.name === parsedBody.data.name) {
+			if (record.name === parsedBody.data.name + '.' + process.env.NEXT_PUBLIC_BASE_DOMAIN) {
 				return NextResponse.json(
 					{ exists: true },
 					{ status: 200 }
