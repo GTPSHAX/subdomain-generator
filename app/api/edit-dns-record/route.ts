@@ -22,6 +22,19 @@ const editDnsRecordSchema = z.object({
 	tags: z.array(z.string().min(1)).optional(),
 });
 
+function getErrorMessage(error: unknown): string {
+	if (error instanceof Error) {
+		const cloudflareMessage = error.message.match(/"message":"([^"]+)"/);
+		if (cloudflareMessage?.[1]) {
+			return cloudflareMessage[1];
+		}
+
+		return error.message;
+	}
+
+	return 'Internal Server Error';
+}
+
 export async function POST(request: Request) {
 	try {
 		const parsedBody = editDnsRecordSchema.safeParse(await request.json());
@@ -88,7 +101,7 @@ export async function POST(request: Request) {
 			{ status: 200 }
 		);
 	} catch (error: unknown) {
-		const message = error instanceof Error ? error.message : 'Internal Server Error';
+		const message = getErrorMessage(error);
 		return NextResponse.json(
 			{ error: message },
 			{ status: 500 }
